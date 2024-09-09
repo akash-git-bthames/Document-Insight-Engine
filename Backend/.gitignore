@@ -1,0 +1,16 @@
+# Environment variables
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Docker
+docker-compose.override.yml
+**/Dockerfile
+**/docker-compose.yml
+
+# Logs
+*.log
