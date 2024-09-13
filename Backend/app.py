@@ -6,30 +6,50 @@ from schemas import DocumentUpload, DocumentResponse
 from s3_utils import upload_to_s3
 from unstructured.partition.pdf import partition_pdf
 from elasticsearch import Elasticsearch
-from langchain.embeddings import OpenAIEmbeddings
-from langchain.vectorstores import ElasticVectorSearch
-from crewai import Agent
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import ElasticVectorSearch
+from langchain_elasticsearch import ElasticsearchStore
+import openai
 import shutil
+from dotenv import load_dotenv
 import os
+import getpass
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+# os.environ["OPENAI_API_KEY"] = getpass.getpass()
+# Initialize OpenAI API Key
+load_dotenv()
+
+api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = api_key
 
 
 # Initialize Elasticsearch client
 es_client = Elasticsearch(hosts=["http://localhost:9200"])
 
 # Initialize LangChain embedding model and ElasticSearch vector store
-embedding_model = OpenAIEmbeddings()
-vector_store = ElasticVectorSearch(
-    embedding_model.embed,
-    es_client,
-    index_name="document_vectors"
+# embedding_model = OpenAIEmbeddings()
+
+embeddings = OpenAIEmbeddings(model="text-embedding-3-large")
+
+# vector_store = ElasticVectorSearch(
+#     # embedding_function=embedding_model.embed_query,  # embedding query function
+#     client=es_client,  # Elasticsearch client instance
+#     index_name="document_vectors"  # Index name for the document vectors
+# )
+
+elastic_vector_search = ElasticsearchStore(
+    es_url="http://localhost:9200",
+    index_name="langchain_index",
+    embedding=embeddings,
+    # es_user="elastic",
+    # es_password="changeme",
 )
 
-# Initialize CrewAI RAG model
-rag_model = Agent(api_key="YOUR_CREWAI_API_KEY")
+
 
 
 # 1. File Upload Route
@@ -111,6 +131,7 @@ def index_document_for_nlp(document: dict):
     vector_store.add_texts([content])
 
 
+# 4. Replace CrewAI with OpenAI for RAG response
 def get_rag_response(query: str):
     # Step 1: Search for relevant content from Elasticsearch using LangChain
     response = vector_store.search(query)
@@ -118,23 +139,28 @@ def get_rag_response(query: str):
     # Step 2: Retrieve the most relevant document content
     most_relevant_content = response['hits'][0]['_source']['content']
     
-    # Step 3: Generate a response using the RAG model
-    generated_response = rag_model.generate(query, context=most_relevant_content)
+    # Step 3: Generate a response using OpenAI GPT-4
+    generated_response = openai.Completion.create(
+        engine="gpt-4",  # You can use gpt-4 or gpt-3.5-turbo
+        prompt=f"Based on the following context, answer the query: {query}\n\nContext: {most_relevant_content}",
+        max_tokens=200
+    )
     
-    return generated_response
+    return generated_response.choices[0].text
 
 
-# 4. Query Route: RAG Agent Query Handling
+# 5. Query Route: OpenAI Query Handling
 @app.get("/query")
 async def query_document(query: str):
-    # Get the response using the RAG model
+    # Get the response using OpenAI GPT-4
     response = get_rag_response(query)
     return {"query": query, "response": response}
+
 
 @app.get("/")
 async def homepage():
     return "hii"
 
+
 # Create the Elasticsearch index for documents on startup
 create_document_index()
-
