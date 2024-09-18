@@ -5,19 +5,36 @@ from models import Base, Document
 from schemas import DocumentUpload, DocumentResponse
 from s3_utils import upload_to_s3
 from unstructured.partition.pdf import partition_pdf
+# from unstructured.partition.utils.ocr_models import OCRAgentTesseract
 from elasticsearch import Elasticsearch
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import ElasticVectorSearch
 from langchain_elasticsearch import ElasticsearchStore
+import boto3
 import openai
 import shutil
 from dotenv import load_dotenv
 import os
 import getpass
 
+# Set the OCR_AGENT environment variable
+os.environ["OCR_AGENT"] = "tesseract"
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+print(f"OCR_AGENT: {os.getenv('OCR_AGENT')}")
+print("Checking if tesseract is available...")
+os.system("tesseract --version")
+# Initialize S3 Client
+s3 = boto3.client(
+    's3',
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    region_name=os.getenv("AWS_REGION")
+)
+
 
 # os.environ["OPENAI_API_KEY"] = getpass.getpass()
 # Initialize OpenAI API Key
@@ -55,55 +72,97 @@ elastic_vector_search = ElasticsearchStore(
 # 1. File Upload Route
 @app.post("/upload/", response_model=DocumentResponse)
 async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    # Step 1: Save the uploaded file temporarily
-    file_location = f"temp_files/{file.filename}"
-    with open(file_location, "wb+") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    try:
+        
+        
+        
+        # os.environ["OCR_AGENT"] = str(OCRAgentTesseract())
+        
+        # Step 1: Create the 'temp_files' directory if it doesn't exist
+        temp_dir = "temp_files"
+        if not os.path.exists(temp_dir):
+            os.makedirs(temp_dir)
+        
+        # Step 1: Save the uploaded file temporarily
 
-    # Step 2: Upload the file to AWS S3
-    s3_url = upload_to_s3(open(file_location, 'rb'), "your-bucket-name", file.filename)
-    if not s3_url:
-        raise HTTPException(status_code=500, detail="Failed to upload to S3")
 
-    # Step 3: Parse the file content using unstructured.io
-    parsed_content = ""
-    if file.content_type == "application/pdf":
-        document = partition_pdf(file_location)
-        parsed_content = document.text
+        file_location = f"temp_files/{file.filename}"
+        with open(file_location, "wb+") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # Step 2: Upload the file to AWS S3
+        try:
+            s3_url = upload_to_s3(open(file_location, 'rb'), "document-insight-engine-1-bucket", file.filename)
+            if not s3_url:
+                raise HTTPException(status_code=500, detail="Failed to upload to S3")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"S3 Upload Error: {str(e)}")
+        
+        # Step 3: Parse the file content using unstructured.io
+        
+        print(f"OCR_AGENT is set to: {os.getenv('OCR_AGENT')}")
+        
 
-    # Step 4: Save document metadata to the database
-    document_db = Document(
-        filename=file.filename,
-        file_type=file.content_type,
-        s3_url=s3_url,
-        parsed_content=parsed_content
-    )
-    db.add(document_db)
-    db.commit()
-    db.refresh(document_db)
+        parsed_content = ""
+        try:
+            if file.content_type == "application/pdf":
+                document = partition_pdf(file_location, ocr_agent="tesseract")
+                parsed_content = "\n".join([elem.text for elem in document if hasattr(elem, 'text')])
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"PDF Parsing Error: {str(e)}")
+        
+        # Step 4: Save document metadata to the database
+        try:
+            document_db = Document(
+                filename=file.filename,
+                file_type=file.content_type,
+                s3_url=s3_url,
+                parsed_content=parsed_content
+            )
+            db.add(document_db)
+            db.commit()
+            db.refresh(document_db)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Database Error: {str(e)}")
+        
+        # Step 5: Index the parsed content in Elasticsearch
+        try:
+            document_data = {
+                "filename": file.filename,
+                "content": parsed_content,
+                "metadata": {"author": "Unknown"},
+                "timestamp": "2024-09-07T10:00:00"
+            }
+            index_document("documents", document_data)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Elasticsearch Indexing Error: {str(e)}")
+        
+        # Step 6: Index parsed content for NLP using LangChain
+        try:
+            index_document_for_nlp(document_data)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"NLP Indexing Error: {str(e)}")
+        
+        # Step 7: Cleanup the temporary file
+        try:
+            os.remove(file_location)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"File Cleanup Error: {str(e)}")
+        
+        return DocumentResponse(
+            id=document_db.id,
+            filename=document_db.filename,
+            file_type=document_db.file_type,
+            s3_url=document_db.s3_url,
+            parsed_content=document_db.parsed_content
+        )
+    
+    except HTTPException as http_exc:
+        raise http_exc
+    except Exception as e:
+        # Generic exception catch-all for unexpected errors
+        raise HTTPException(status_code=500, detail=f"Unexpected Error: {str(e)}")
 
-    # Step 5: Index the parsed content in Elasticsearch
-    document_data = {
-        "filename": file.filename,
-        "content": parsed_content,
-        "metadata": {"author": "Unknown"},
-        "timestamp": "2024-09-07T10:00:00"
-    }
-    index_document("documents", document_data)
-
-    # Step 6: Index parsed content for NLP using LangChain
-    index_document_for_nlp(document_data)
-
-    # Step 7: Cleanup the temporary file
-    os.remove(file_location)
-
-    return DocumentResponse(
-        id=document_db.id,
-        filename=document_db.filename,
-        file_type=document_db.file_type,
-        s3_url=document_db.s3_url,
-        parsed_content=document_db.parsed_content
-    )
 
 
 # 2. Elasticsearch: Index Document
