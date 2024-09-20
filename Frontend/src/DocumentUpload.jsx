@@ -37,16 +37,14 @@ const DocumentUpload = () => {
   };
 
   return (
-    <div>
-      <h1>Document Upload</h1>
-      <input type="file" onChange={handleFileChange} />
+    <div className="w-[60vw] m-auto flex flex-col items-center h-[80vh] justify-evenly shadow-lg bg-slate-300 rounded-lg shadow-slate-800 mt-10">
+      <h1 className='text-3xl font-bold text-[rgb(61,106,255)]'>Document Upload</h1>
+      <input type="file" className='input' onChange={handleFileChange} />
       <button onClick={handleUpload}>Upload</button>
-      <p>{uploadStatus}</p>
-      {parsingStatus && <p>{parsingStatus}</p>}
+      <p className='text-red-700'>{uploadStatus}</p>
+      {parsingStatus && <p className='text-red-700'>{parsingStatus}</p>}
     </div>
   );
 };
 
 export default DocumentUpload;
-
-

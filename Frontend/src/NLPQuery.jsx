@@ -24,16 +24,19 @@ const NLPQuery = () => {
   };
 
   return (
-    <div>
-      <h1>NLP Query</h1>
-      <input
-        type="text"
-        value={query}
-        onChange={handleQueryChange}
-        placeholder="Ask a question..."
-      />
+    <div className="w-[60vw] m-auto flex flex-col items-center min-h-[80vh] justify-evenly shadow-lg bg-slate-200 rounded-lg shadow-slate-800 mt-10">
+      <h1 className='text-2xl font-bold text-[rgb(61,106,255)]'>NLP Query</h1>
+      <textarea
+  className="input h-40"
+  value={query}
+  onChange={handleQueryChange}
+  placeholder="Ask a question..."
+  rows="4"
+  cols="50"
+/>
+
       <button onClick={handleQuerySubmit}>Submit</button>
-      {response && <p>Response: {response}</p>}
+      {response && <p className='text-red-700'>Response: {response}</p>}
     </div>
   );
 };
