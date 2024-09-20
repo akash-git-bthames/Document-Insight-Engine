@@ -1,0 +1,13 @@
+fastapi
+sqlalchemy
+uvicorn
+boto3
+unstructured
+elasticsearch
+langchain
+pytesseract
+pdf2image
+Pillow
+python-dotenv
+openai
+cohere
