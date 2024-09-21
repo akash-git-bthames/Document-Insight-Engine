@@ -1,0 +1,14 @@
+name:  Doc-Runner
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+
+  build:
+
+    runs-on: ['self-hosted', 'Linux', 'X64' ]
+
+    steps:
+    - uses: actions/checkout@v2
