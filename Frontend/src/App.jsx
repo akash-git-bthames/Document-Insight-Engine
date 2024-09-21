@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-d
 import DocumentUpload from './DocumentUpload';
 import NLPQuery from './NLPQuery';
 import Login from './Login';
+import Register from './Register';
 
 const App = () => {
   const [authToken, setAuthToken] = useState(localStorage.getItem('authToken') || '');
@@ -21,6 +22,10 @@ const App = () => {
         <Route
           path="/login"
           element={isAuthenticated ? <Navigate to="/upload" /> : <Login setAuthToken={setAuthToken} />}
+        />
+        <Route
+          path="/register"
+          element={isAuthenticated ? <Navigate to="/upload" /> : <Register />}
         />
         <Route
           path="/upload"

@@ -1,8 +1,9 @@
-from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, Depends, UploadFile, File, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from database import get_db, engine
-from models import Base, Document
-from schemas import DocumentUpload, DocumentResponse
+from database import get_db, Base, engine
+from models import User, Document, Query
+from schemas import UserCreate, UserResponse, DocumentResponse, DocumentCreate, QueryResponse, QueryCreate
 from s3_utils import upload_to_s3
 from elasticsearch import Elasticsearch
 from langchain_cohere import CohereEmbeddings, ChatCohere
@@ -19,9 +20,32 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain import hub
 
+from jwtAuthenticate import get_password_hash, create_access_token, verify_password,get_current_user
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
+
+from datetime import timedelta
+
+
+
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+origins = [
+    "http://localhost",
+    "http://localhost:5173",  # Example for a frontend running on a different port
+    "http://yourdomain.com",  # Example for a deployed frontend
+]
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Allow specific origins
+    allow_credentials=True,  # Allow cookies and authorization headers
+    allow_methods=["*"],  # Allow all HTTP methods
+    allow_headers=["*"],  # Allow all HTTP headers
+)
 
 # Load environment variables
 load_dotenv()
@@ -67,6 +91,44 @@ def create_document_index(index_name: str = "documents"):
                 }
             }
         })
+
+
+# OAuth2PasswordBearer is a dependency that retrieves the token from the Authorization header
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# User signup
+@app.post("/signup", response_model=UserResponse)
+def create_user(user: UserCreate, db: Session = Depends(get_db)):
+    db_user = db.query(User).filter(User.email == user.email).first()
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    hashed_password = get_password_hash(user.password)
+    new_user = User(username=user.email, email=user.email, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return new_user
+
+# Token login for OAuth2
+@app.post("/token", response_model=dict)
+def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
+    
+    access_token_expires = timedelta(minutes=30)
+    access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# Fetch current authenticated user
+@app.get("/users/me", response_model=UserResponse)
+def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+
 
 # 1. File Upload Route
 @app.post("/upload/", response_model=DocumentResponse)
