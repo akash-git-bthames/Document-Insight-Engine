@@ -17,7 +17,6 @@ jobs:
 
       # Step 2: Change directory to /Backend
       - name: Change to Backend directory
-        working-directory: ./Backend
         run: echo "Changed to Backend directory"
 
       # Step 3: Copy .env file from /home/ubuntu to Backend directory
@@ -75,6 +74,7 @@ jobs:
 
       # Step 3: Set up Node.js for frontend
       - name: Set up Node.js
+        working-directory: ./Frontend  # Added working-directory here
         uses: actions/setup-node@v2
         with:
           node-version: '16'
