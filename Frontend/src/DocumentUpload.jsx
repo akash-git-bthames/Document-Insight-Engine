@@ -2,11 +2,17 @@
 import React, { useState } from "react";
 import axios from "axios";
 import NLPQuery from "./NLPQuery";
+import Loader from "./Loaders";
+import Loader1 from "./Loader1"
+import TaskAltIcon from '@mui/icons-material/TaskAlt';
 
 const DocumentUpload = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState("");
   const [parsingStatus, setParsingStatus] = useState("");
+  const [showLoader,setShowLoader]=useState(false);
+  const [showLoader1,setShowLoader1]=useState(false);
+
 
   const handleFileChange = (event) => {
     setSelectedFile(event.target.files[0]);
@@ -23,24 +29,32 @@ const DocumentUpload = () => {
 
     try {
       setUploadStatus("Uploading...");
-      const response = await axios.post("http://127.0.0.1:8000/upload", formData, {
+      setShowLoader1(true)
+      
+      const response = await axios.post("http://65.2.86.51:8000/upload", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
       });
       setUploadStatus("Upload successful!");
+      setShowLoader1(false);
 
       // Simulate a status check for parsing
+      setShowLoader(true);
       setParsingStatus("Parsing in progress...");
-      setTimeout(() => setParsingStatus("Parsing completed!"), 3000);
+      
+      setTimeout(() => {setParsingStatus("Parsing completed!")
+        setShowLoader(false);
+      }, 3000);
     } catch (error) {
       setUploadStatus("Upload failed");
     }
   };
 
   return (
-    <div className="w-[60vw] m-auto flex flex-col items-center h-[60vh] justify-evenly shadow-xl bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg mt-10 p-8">
-      <h1 className="text-3xl font-bold text-white">Document Upload</h1>
+    <div>
+      <div className="w-[60vw] m-auto flex flex-col items-center  gap-14 shadow-xl bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg mt-10 p-8">
+      <h1 className="text-3xl font-bold text-white mt-10">Document Upload</h1>
       <div className="flex space-x-4">
         <input type="file" className="input" onChange={handleFileChange} />
         <button
@@ -50,10 +64,24 @@ const DocumentUpload = () => {
           Upload
         </button>
       </div>
-      <p className="text-white">{uploadStatus}</p>
-      {parsingStatus && <p className="text-white">{parsingStatus}</p>}
+      <div className="text-white flex items-center ">
+        <div>{showLoader1 && <Loader1/>}</div>
+        <div className={`text-lg font-bold flex items-center gap-2 ${uploadStatus==="Upload successful!"? "text-green-600":""}`}>{uploadStatus==="Upload successful!"&&<TaskAltIcon/> } <div>{uploadStatus}</div></div>
+        </div>
+        
+         {parsingStatus && <div className="text-white flex flex-col items-center gap-2 ">
+          {showLoader && <Loader/>}
+          {parsingStatus==="Parsing completed!"&& <div className="text-green-500"><TaskAltIcon/></div>}
+          <div className={` ${parsingStatus==="Parsing completed!"?"text-green-500 text-xl font-bold":""}`}>{parsingStatus}</div>
+          
+          </div>}
+          
+       
 
-      <NLPQuery />
+          {parsingStatus==="Parsing completed!" && <NLPQuery />}
+    </div>
+   
+    
     </div>
   );
 };
