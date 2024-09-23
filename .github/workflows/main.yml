@@ -1,14 +1,49 @@
-name:  Doc-Runner
+name: Doc-Runner
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-
   build:
-
-    runs-on: ['self-hosted', 'Linux', 'X64' ]
+    runs-on: ['self-hosted', 'Linux', 'X64']
 
     steps:
-    - uses: actions/checkout@v2
+    # Step 1: Checkout the repository
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    # Step 2: Change directory to /Backend
+    - name: Change to Backend directory
+      working-directory: ./Backend
+      run: echo "Changed to Backend directory"
+
+    # Step 3: Copy .env file from /home/ubuntu to Backend directory
+    - name: Copy .env file
+      run: cp /home/ubuntu/.env .
+
+    # Step 4: Create a Python virtual environment
+    - name: Create Python Virtual Environment
+      run: python3 -m venv venv
+
+    # Step 5: Activate virtual environment and install dependencies
+    - name: Install dependencies
+      run: |
+        source venv/bin/activate
+        pip install --upgrade pip setuptools
+        pip install --no-cache-dir -r requirements.txt
+
+    # Step 6: Ensure Elasticsearch is running or start it with Docker if not running
+    - name: Check Elasticsearch
+      run: |
+        if ! curl -s http://localhost:9200; then
+          sudo docker run -d -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:7.17.24
+        else
+          echo "Elasticsearch is already running"
+        fi
+
+    # Step 7: Run the FastAPI app with pm2
+    - name: Start FastAPI app
+      run: |
+        source venv/bin/activate
+        pm2 start uvicorn --interpreter=venv/bin/python --name "fastapi-app" -- app:app --host 0.0.0.0 --port 8000 --reload
