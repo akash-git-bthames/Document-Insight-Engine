@@ -1,0 +1,102 @@
+name: Full-Stack Deployment
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy-backend:
+    runs-on: ['self-hosted', 'Linux', 'X64']
+
+    steps:
+      # Backend (FastAPI) Deployment
+
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Change directory to /Backend
+      - name: Change to Backend directory
+        working-directory: ./Backend
+        run: echo "Changed to Backend directory"
+
+      # Step 3: Copy .env file from /home/ubuntu to Backend directory
+      - name: Copy .env file
+        run: cp /home/ubuntu/.env ./Backend
+
+      # Step 4: Create a Python virtual environment in Backend directory
+      - name: Create Python Virtual Environment
+        working-directory: ./Backend
+        run: python3 -m venv venv
+
+      # Step 5: Activate virtual environment and install dependencies
+      - name: Install dependencies for Backend
+        working-directory: ./Backend
+        run: |
+          source venv/bin/activate
+          pip install --upgrade pip setuptools
+          pip install --no-cache-dir -r requirements.txt
+
+      # Step 6: Ensure Elasticsearch is running or start it with Docker if not running
+      - name: Check Elasticsearch
+        run: |
+          if ! curl -s http://localhost:9200; then
+            sudo docker run -d -p 9200:9200 -p 9300:9300 -e "discovery.type=single-node" docker.elastic.co/elasticsearch/elasticsearch:7.17.24
+          else
+            echo "Elasticsearch is already running"
+          fi
+
+      # Step 7: Stop the previous FastAPI instance (if running)
+      - name: Stop previous FastAPI instance
+        run: |
+          pm2 stop fastapi-app || echo "No previous instance running"
+
+      # Step 8: Run the FastAPI app with pm2
+      - name: Start FastAPI app
+        working-directory: ./Backend
+        run: |
+          source venv/bin/activate
+          pm2 start uvicorn --interpreter=venv/bin/python --name "fastapi-app" -- app:app --host 0.0.0.0 --port 8000 --reload
+
+  deploy-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Frontend Deployment
+
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Change to Frontend directory
+      - name: Change to Frontend directory
+        working-directory: ./Frontend
+        run: echo "Changed to Frontend directory"
+
+      # Step 3: Set up Node.js for frontend
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      # Step 4: Install dependencies for Frontend
+      - name: Install dependencies for Frontend
+        working-directory: ./Frontend
+        run: npm install
+
+      # Step 5: Build frontend
+      - name: Build Frontend
+        working-directory: ./Frontend
+        run: npm run build
+
+      # Step 6: Deploy frontend to S3
+      - name: Deploy Frontend to S3
+        working-directory: ./Frontend
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          S3_BUCKET_NAME: demo-bucket
+        run: |
+          aws s3 sync build/ s3://$S3_BUCKET_NAME --delete
