@@ -20,14 +20,16 @@ jobs:
 
     # Step 3: Copy .env file from /home/ubuntu to Backend directory
     - name: Copy .env file
-      run: cp /home/ubuntu/.env .
+      run: cp /home/ubuntu/.env ./Backend
 
-    # Step 4: Create a Python virtual environment
+    # Step 4: Create a Python virtual environment in Backend directory
     - name: Create Python Virtual Environment
+      working-directory: ./Backend
       run: python3 -m venv venv
 
     # Step 5: Activate virtual environment and install dependencies
     - name: Install dependencies
+      working-directory: ./Backend
       run: |
         source venv/bin/activate
         pip install --upgrade pip setuptools
@@ -44,6 +46,7 @@ jobs:
 
     # Step 7: Run the FastAPI app with pm2
     - name: Start FastAPI app
+      working-directory: ./Backend
       run: |
         source venv/bin/activate
         pm2 start uvicorn --interpreter=venv/bin/python --name "fastapi-app" -- app:app --host 0.0.0.0 --port 8000 --reload
