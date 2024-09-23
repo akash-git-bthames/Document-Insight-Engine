@@ -44,7 +44,12 @@ jobs:
           echo "Elasticsearch is already running"
         fi
 
-    # Step 7: Run the FastAPI app with pm2
+    # Step 7: Stop the previous FastAPI instance (if running)
+    - name: Stop previous FastAPI instance
+      run: |
+        pm2 stop fastapi-app || echo "No previous instance running"
+
+    # Step 8: Run the FastAPI app with pm2
     - name: Start FastAPI app
       working-directory: ./Backend
       run: |
