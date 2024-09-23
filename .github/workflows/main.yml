@@ -69,12 +69,11 @@ jobs:
 
       # Step 2: Change to Frontend directory
       - name: Change to Frontend directory
-        working-directory: ./Frontend
         run: echo "Changed to Frontend directory"
 
       # Step 3: Set up Node.js for frontend
       - name: Set up Node.js
-        working-directory: ./Frontend  # Added working-directory here
+        working-directory: ./Frontend
         uses: actions/setup-node@v2
         with:
           node-version: '16'
