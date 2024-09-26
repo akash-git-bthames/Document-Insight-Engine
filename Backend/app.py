@@ -33,7 +33,7 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 origins = [
-    "*", # for allowing all orgins
+    "*", # for allowing all orgins for testing
     "http://doc-inside-engine.s3-website.ap-south-1.amazonaws.com/" # or allowing frontend origin from s3
     "http://localhost",
     "http://localhost:5173",  # Example for a frontend running on a different port
