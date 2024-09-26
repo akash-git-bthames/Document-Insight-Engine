@@ -1,0 +1,47 @@
+name: Frontend Deployment
+
+on:
+  push:
+    branches: [ "main" ]
+
+defaults:
+  run:
+    working-directory: ./Frontend   
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      # Step 2: Change to Frontend directory
+      - name: Change to Frontend directory
+        run: echo "Changed to Frontend directory"
+
+      # Step 3: Set up Node.js for frontend
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+          cache: 'npm'
+
+      # Step 4: Install dependencies for Frontend
+      - name: Install dependencies for Frontend
+        run: npm install
+
+      # Step 5: Build frontend
+      - name: Build Frontend
+        run: npm run build
+
+      # Step 6: Deploy frontend to S3
+      - name: Deploy Frontend to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ap-south-1
+          S3_BUCKET_NAME: demo-bucket
+        run: |
+          aws s3 sync build/ s3://$S3_BUCKET_NAME --delete
