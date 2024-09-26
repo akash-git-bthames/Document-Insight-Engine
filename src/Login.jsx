@@ -15,7 +15,7 @@ const Login = ({ setAuthToken }) => {
       params.append("username", email); // Assuming 'email' is used as 'username'
       params.append("password", password);
 
-      const response = await axios.post("http://65.2.86.51:8000//token", params, {
+      const response = await axios.post("http://65.2.86.51:8000/token", params, {
         headers: {
           "Content-Type": "application/x-www-form-urlencoded",
         },
