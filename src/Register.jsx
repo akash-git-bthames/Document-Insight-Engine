@@ -13,14 +13,14 @@ const Register = ({ setAuthToken }) => {
   const handleRegister = async () => {
     try {
       const response = await axios.post("http://65.2.86.51:8000//signup", { email, password, username});
-      navigate("/login");
+      navigate("/");
     } catch (error) {
       setError("Login failed. Please check your credentials.");
     }
   };
 
   const loginHandler = () => {
-    navigate("/login")
+    navigate("/")
   }
 
   return (

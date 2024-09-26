@@ -20,7 +20,7 @@ const App = () => {
     <Router>
       <Routes>
         <Route
-          path="/login"
+          path="/"
           element={isAuthenticated ? <Navigate to="/upload" /> : <Login setAuthToken={setAuthToken} />}
         />
         <Route
@@ -29,11 +29,11 @@ const App = () => {
         />
         <Route
           path="/upload"
-          element={isAuthenticated ? <DocumentUpload /> : <Navigate to="/login" />}
+          element={isAuthenticated ? <DocumentUpload /> : <Navigate to="/" />}
         />
         <Route
           path="/query"
-          element={isAuthenticated ? <NLPQuery /> : <Navigate to="/login" />}
+          element={isAuthenticated ? <NLPQuery /> : <Navigate to="/" />}
         />
       </Routes>
     </Router>
