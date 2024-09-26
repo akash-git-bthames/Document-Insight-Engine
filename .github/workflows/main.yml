@@ -94,4 +94,4 @@ jobs:
       - name: Deploy Frontend to S3
         working-directory: ./Frontend
         run: |
-          aws s3 sync build/ s3://doc-inside-engine --delete
+          aws s3 sync dist/ s3://doc-inside-engine --delete
