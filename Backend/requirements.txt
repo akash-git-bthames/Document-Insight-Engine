@@ -86,3 +86,4 @@ tzdata==2024.1
 urllib3==2.2.3
 uvicorn==0.30.6
 yarl==1.11.1
+poppler-utils==0.1.0
