@@ -17,8 +17,8 @@ class Document(Base):
     __tablename__ = 'documents'
 
     id = Column(Integer, primary_key=True, index=True)
-    filename = Column(String(255))
-    file_type = Column(String(50))
+    filename = Column(String(500))
+    file_type = Column(String(500))
     s3_url = Column(String(500))
     parsed_content = Column(Text)
     upload_timestamp = Column(DateTime(timezone=True), server_default=func.now())
