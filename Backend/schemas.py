@@ -32,7 +32,7 @@ class UserResponse(UserBase):
 
 # Base schema for Document
 class DocumentBase(BaseModel):
-    filename: str
+    filename: constr(max_length=500)  # Adjust the max_length as needed
     file_type: str
     s3_url: str
     parsed_content: str
