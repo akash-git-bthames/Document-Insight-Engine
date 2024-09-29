@@ -20,12 +20,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain import hub
 
-from jwtAuthenticate import get_password_hash, create_access_token, verify_password,get_current_user
+from jwtAuthenticate import get_password_hash, create_access_token, verify_password, get_current_user
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
-
 from datetime import timedelta
-
 
 
 Base.metadata.create_all(bind=engine)
@@ -33,8 +31,8 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 origins = [
-    "*", # for allowing all orgins for testing
-    "http://doc-inside-engine.s3-website.ap-south-1.amazonaws.com", # or allowing frontend origin from s3
+    "*",  # for allowing all origins for testing
+    "http://doc-inside-engine.s3-website.ap-south-1.amazonaws.com",  # or allowing frontend origin from s3
     "http://localhost",
     "http://localhost:5173",  # Example for a frontend running on a different port
     "http://yourdomain.com",  # Example for a deployed frontend
@@ -58,7 +56,7 @@ s3 = boto3.client(
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
     region_name=os.getenv("AWS_REGION"),
-    verify=False  
+    verify=False
 )
 
 # Initialize Elasticsearch client
@@ -105,13 +103,13 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db_user = db.query(User).filter(User.email == user.email).first()
     if db_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     hashed_password = get_password_hash(user.password)
     new_user = User(username=user.email, email=user.email, hashed_password=hashed_password)
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    
+
     return new_user
 
 # Token login for OAuth2
@@ -120,7 +118,7 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
     user = db.query(User).filter(User.username == form_data.username).first()
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
-    
+
     access_token_expires = timedelta(minutes=30)
     access_token = create_access_token(data={"sub": user.username}, expires_delta=access_token_expires)
     return {"access_token": access_token, "token_type": "bearer"}
@@ -130,32 +128,29 @@ def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db:
 def read_users_me(current_user: User = Depends(get_current_user)):
     return current_user
 
-
-
-
 # 1. File Upload Route
 @app.post("/upload/", response_model=DocumentResponse)
-async def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
+def upload_document(file: UploadFile = File(...), db: Session = Depends(get_db)):
     temp_dir = "temp_files"
     if not os.path.exists(temp_dir):
         os.makedirs(temp_dir)
-    
+
     file_location = f"{temp_dir}/{file.filename}"
     try:
         with open(file_location, "wb+") as buffer:
             shutil.copyfileobj(file.file, buffer)
-        
+
         # Step 2: Upload the file to AWS S3
         s3_url = upload_to_s3(open(file_location, 'rb'), "document-insight-engine-1-bucket", file.filename)
         if not s3_url:
             raise HTTPException(status_code=500, detail="Failed to upload to S3")
-        
+
         # Step 3: Parse the file content using pytesseract
         parsed_content = ""
         if file.content_type == "application/pdf":
             images = pdf2image.convert_from_path(file_location)
             parsed_content = "\n".join([pytesseract.image_to_string(image) for image in images])
-        
+
         # Step 4: Save document metadata to the database
         document_db = Document(
             filename=file.filename,
@@ -166,7 +161,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
         db.add(document_db)
         db.commit()
         db.refresh(document_db)
-        
+
         # Step 5: Index the parsed content in Elasticsearch
         document_data = {
             "filename": file.filename,
@@ -175,10 +170,10 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
             "timestamp": "2024-09-07T10:00:00"
         }
         index_document("documents", document_data)
-        
+
         # Step 6: Index parsed content for NLP using LangChain
         index_document_for_nlp(document_data)
-        
+
         return DocumentResponse(
             id=document_db.id,
             filename=document_db.filename,
@@ -186,7 +181,7 @@ async def upload_document(file: UploadFile = File(...), db: Session = Depends(ge
             s3_url=document_db.s3_url,
             parsed_content=document_db.parsed_content
         )
-    
+
     except HTTPException as http_exc:
         raise http_exc
     except Exception as e:
@@ -218,21 +213,19 @@ rag_chain = (
     | StrOutputParser()
 )
 
-
 # RAG Response Generation Route
 @app.get("/query")
-async def query_document(query: str):
+def query_document(query: str):
     # Use RAG pipeline to retrieve documents and generate response
-    response=""
+    response = ""
     for chunk in rag_chain.stream(query):
-        response  += chunk
+        response += chunk
         if response == "I don't know.":
-            response =""
+            response = ""
             response += "Sorry unable to answer your question: "
             response += query
         print(chunk, end="", flush=True)
 
-    
     return {"query": query, "response": response}
 
 # Create the document index on startup
@@ -240,15 +233,15 @@ create_document_index()
 
 # Home Route
 @app.get("/")
-async def homepage():
+def homepage():
     return "Hello from Document Management System!"
 
 # Elasticsearch Search Route
 @app.post("/api/search")
-async def search_documents(request: Request):
-    data = await request.json()
+def search_documents(request: Request):
+    data = request.json()
     query = data.get("query")
-    
+
     # Construct the Elasticsearch search query
     search_body = {
         "query": {
@@ -257,9 +250,9 @@ async def search_documents(request: Request):
             }
         }
     }
-    
+
     # Execute the search query
     response = es_client.search(index="documents", body=search_body)
-    
+
     # Return the search results
     return response
