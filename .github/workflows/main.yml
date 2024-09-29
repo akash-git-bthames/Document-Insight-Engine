@@ -29,12 +29,13 @@ jobs:
         working-directory: ./Backend
         run: python3 -m venv venv
 
-      # Step 5: Activate virtual environment and install dependencies
+     # Step 5: Activate virtual environment and install dependencies
       - name: Install dependencies for Backend
         working-directory: ./Backend
         run: |
           source venv/bin/activate
-          sudo apt install poppler-utils
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y poppler-utils
           pip install --upgrade pip setuptools
           pip install --no-cache-dir -r requirements.txt
 
