@@ -34,6 +34,7 @@ jobs:
         working-directory: ./Backend
         run: |
           source venv/bin/activate
+          sudo apt install poppler-utils
           pip install --upgrade pip setuptools
           pip install --no-cache-dir -r requirements.txt
 
